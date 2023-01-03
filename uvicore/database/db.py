@@ -1,7 +1,6 @@
 from uvicore.typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Union
 
 import sqlalchemy as sa
-from databases import Database as EncodeDatabase
 from sqlalchemy.sql import ClauseElement
 
 import uvicore
@@ -9,7 +8,12 @@ from uvicore.contracts import Connection
 from uvicore.contracts import Database as DatabaseInterface
 from uvicore.database.query import DbQueryBuilder
 from uvicore.support.dumper import dd, dump
-from sqlalchemy.engine.result import RowProxy
+
+from sqlalchemy.engine.result import Row
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
+from sqlalchemy import Table, MetaData
+from aio_databases import Database
 
 @uvicore.service('uvicore.database.db.Db',
     aliases=['Database', 'database', 'db'],
@@ -30,11 +34,11 @@ class Db(DatabaseInterface):
         return self._connections
 
     @property
-    def engines(self) -> Dict[str, sa.engine.Engine]:
+    def engines(self) -> Dict[str, AsyncEngine]:
         return self._engines
 
     @property
-    def databases(self) -> Dict[str, EncodeDatabase]:
+    def databases(self) -> Dict[str, Database]:
         return self._databases
 
     @property
@@ -73,9 +77,9 @@ class Db(DatabaseInterface):
                         + ':' + str(connection.port)
                         + '/' + connection.database
                     )
-                self._engines[connection.metakey] = sa.create_engine(connection.url)
-                self._databases[connection.metakey] = EncodeDatabase(encode_url)
-                self._metadatas[connection.metakey] = sa.MetaData()
+                self._engines[connection.metakey] = create_async_engine(connection.url, echo=True, poolclass=NullPool,)
+                self._databases[connection.metakey] = Database(encode_url)
+                self._metadatas[connection.metakey] = MetaData()
 
     def packages(self, connection: str = None, metakey: str = None) -> Connection:
         if not metakey:
@@ -127,11 +131,18 @@ class Db(DatabaseInterface):
         if connection:
             return connection.prefix + table
 
-    def engine(self, connection: str = None, metakey: str = None) -> sa.engine.Engine:
+    def engine(self, connection: str = None, metakey: str = None) -> AsyncEngine:
         metakey = self.metakey(connection, metakey)
         return self.engines.get(metakey)
 
-    async def database(self, connection: str = None, metakey: str = None) -> EncodeDatabase:
+    def session(self, connection: str = None, metakey: str = None) -> AsyncSession:
+        metakey = self.metakey(connection, metakey)
+        engine = self.engine(connection,metakey)
+
+        return async_sessionmaker(engine, expire_on_commit=False)
+
+
+    async def database(self, connection: str = None, metakey: str = None) -> Database:
         metakey = self.metakey(connection, metakey)
 
         # Do NOT connect on the fly.  For some reason the first time I query
@@ -169,22 +180,25 @@ class Db(DatabaseInterface):
             if database.is_connected:
                 await database.disconnect()
 
-    async def fetchall(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> List[RowProxy]:
-        database = await self.database(connection, metakey)
-        return await database.fetch_all(query, values)
+    async def fetchall(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> List[Row]:
+        conn = await self.database(connection, metakey).connect()
+        return await conn.fetchall(query, values)
 
-    async def fetchone(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> Optional[RowProxy]:
-        database = await self.database(connection, metakey)
-        return await database.fetch_one(query, values)
+
+    async def fetchone(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> Optional[Row]:
+        conn = await self.database(connection, metakey).connect()
+        return await conn.fetchone(query, values)
+
 
     async def execute(self, query: Union[ClauseElement, str], values: Union[List, Dict] = None, connection: str = None, metakey: str = None) -> Any:
-        database = await self.database(connection, metakey)
+        conn = await self.database(connection, metakey).connect()
         if type(values) == dict:
-            return await database.execute(query, values)
+            return await conn.execute(query, values)
         elif type(values) == list:
-            return await database.execute_many(query, values)
+            return await conn.executemany(query, values)
         else:
-            return await database.execute(query)
+            return await conn.execute(query)
+
 
     #  async def iterate(self, query: Union[ClauseElement, str], values: dict = None, connection: str = None) -> AsyncGenerator[Mapping, None]:
     #     async with self.connection() as connection:

@@ -2,19 +2,20 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union, Mapping, Optional
 
 try:
-    from sqlalchemy.engine import Engine
+    from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
     from sqlalchemy import MetaData, Table
-    from databases import Database as EncodeDatabase
+    from aio_databases import Database
     from sqlalchemy.sql import ClauseElement
-    from sqlalchemy.engine.result import RowProxy
+    from sqlalchemy.engine.result import Row
 except:
     sa = None
-    Engine = None
+    AsyncEngine = None
+    AsyncSession = None
     Table = None
     MetaData = None
-    EncodeDatabase = None
     ClauseElement = None
-    RowProxy = None
+    Row = None
+    Database = None
 
 from uvicore.contracts import DbQueryBuilder
 from .connection import Connection
@@ -38,13 +39,13 @@ class Database(ABC):
 
     @property
     @abstractmethod
-    def engines(self) -> Dict[str, Engine]:
+    def engines(self) -> Dict[str, AsyncEngine]:
         """All engines for all unique (by metakey) connections, keyed by metakey"""
         pass
 
     @property
     @abstractmethod
-    def databases(self) -> Dict[str, EncodeDatabase]:
+    def databases(self) -> Dict[str, Database]:
         """All Encode Databases for all unique (by metakey) connections, keyed by metakey"""
         pass
 
@@ -95,7 +96,13 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    async def database(self, connection: str = None, metakey: str = None) -> EncodeDatabase:
+    def session(self, connection: str = None, metakey: str = None) -> AsyncSession:
+        """Get one SQLAlchemy AsyncSession by connection str or metakey"""
+        pass
+
+
+    @abstractmethod
+    async def database(self, connection: str = None, metakey: str = None) -> Database:
         """Get one Encode Database by connection str or metakey"""
         pass
 
@@ -105,12 +112,12 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    async def fetchall(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> List[RowProxy]:
+    async def fetchall(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> List[Row]:
         """Fetch List of records from a SQLAlchemy Core Query based on connection str or metakey"""
         pass
 
     @abstractmethod
-    async def fetchone(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> Optional[RowProxy]:
+    async def fetchone(self, query: Union[ClauseElement, str], values: Dict = None, connection: str = None, metakey: str = None) -> Optional[Row]:
         """Fetch one record from a SQLAlchemy Core Query based on connection str or metakey"""
         pass
 

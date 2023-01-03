@@ -2,7 +2,7 @@
 #import asyncclick as click
 
 # If using local copy of asyncclick
-from . import asyncclick as click
+import asyncclick as click
 
 from .click_colors import HelpColorsCommand, HelpColorsGroup
 

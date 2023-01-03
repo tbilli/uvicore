@@ -5,8 +5,8 @@ import os
 #from asyncclick.termui import _ansi_colors, _ansi_reset_all
 
 # If using local copy of asyncclick
-from . import asyncclick as click
-from .asyncclick.termui import _ansi_colors, _ansi_reset_all
+import asyncclick as click
+from asyncclick.termui import _ansi_colors, _ansi_reset_all
 
 
 

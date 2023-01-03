@@ -41,8 +41,10 @@ async def cli(ctx):
     # showing ./uvicore main help output.  Only on subcommand help output or actual command
     await console_startup()
 
-    # Console shutdown handler
-    ctx.call_on_close(console_shutdown)
+    # Adding the async resource contexts gets the latest version of asyncclick to work out of the box
+    context = await ctx.with_async_resource(ctx)
+    context.call_on_close(console_shutdown)
+
 
     # The actual command runs right here
 

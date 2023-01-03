@@ -6,8 +6,8 @@ import sys
 #from asyncclick import argument, option
 
 # If using local copy of asyncclick
-from . import asyncclick as click
-from .asyncclick import argument, option
+import asyncclick as click
+from asyncclick import argument, option
 
 
 from .decorators import command, group
